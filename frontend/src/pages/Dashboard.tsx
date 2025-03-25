@@ -1,8 +1,29 @@
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from '../hooks/useAuth';
+import {
+  Box,
+  Container,
+  Typography,
+  Button,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  Chip,
+  IconButton,
+  CircularProgress,
+  Paper,
+  Divider
+} from '@mui/material';
+import {
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Logout as LogoutIcon
+} from '@mui/icons-material';
 
 interface Letter {
   id: string;
@@ -18,14 +39,42 @@ const Dashboard: React.FC = () => {
   const { token, logout } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: letters, isLoading, error } = useQuery<Letter[]>({
+  const { data: letters, isLoading, error, refetch } = useQuery<Letter[]>({
     queryKey: ['letters'],
     queryFn: async () => {
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/letters`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return response.data;
+      try {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/letters`, {
+          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true
+        });
+        
+        // Validate the response data
+        if (!response.data || !Array.isArray(response.data)) {
+          console.error('Invalid response data format:', response.data);
+          return [];
+        }
+        
+        // Filter out any potentially invalid letters
+        const validLetters = response.data.filter(letter => 
+          letter && letter.id && letter.title
+        );
+        
+        console.log(`Fetched ${validLetters.length} valid letters`);
+        return validLetters;
+      } catch (error) {
+        console.error('Error fetching letters:', error);
+        
+        // Handle 403 errors (expired token)
+        if (axios.isAxiosError(error) && error.response?.status === 403) {
+          alert('Your session has expired. Please log in again.');
+          logout();
+          setTimeout(() => navigate('/login'), 1000);
+        }
+        
+        throw error;
+      }
     },
+    enabled: !!token,
   });
 
   console.log("Dashboard rendering with:", { 
@@ -34,90 +83,230 @@ const Dashboard: React.FC = () => {
     error: error?.message 
   });
 
+  // Clean up any invalid letter references from localStorage
+  useEffect(() => {
+    if (!isLoading && letters) {
+      // Get valid letter IDs
+      const validIds = new Set(letters.map(letter => letter.id));
+      
+      // Clear any editor data that references non-existent letters
+      try {
+        // Check localStorage for any editor state
+        const storageKeys = Object.keys(localStorage);
+        for (const key of storageKeys) {
+          if (key.startsWith('editor_') || key.includes('letter_')) {
+            const idMatch = key.match(/[0-9a-fA-F]{24}/);
+            if (idMatch && !validIds.has(idMatch[0])) {
+              console.log(`Removing invalid letter reference: ${key}`);
+              localStorage.removeItem(key);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error cleaning localStorage:', error);
+      }
+    }
+  }, [isLoading, letters]);
+
+  // Function to refresh letters data
+  const refreshLetters = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['letters'] });
+  }, [queryClient]);
+
+  // Refresh letters when component mounts to ensure fresh data
+  useEffect(() => {
+    refreshLetters();
+    // Set up an interval to refresh data every 30 seconds
+    const intervalId = setInterval(refreshLetters, 30000);
+    
+    return () => clearInterval(intervalId);
+  }, [refreshLetters]);
+
   const handleCreateNew = () => {
     navigate('/editor');
   };
 
-  const handleEdit = (id: string) => {
-    navigate(`/editor/${id}`);
-  };
+  const handleEdit = useCallback((id: string) => {
+    // First check if this letter exists in our data
+    const letterExists = letters?.some(letter => letter.id === id);
+    
+    if (!letterExists) {
+      // Letter doesn't exist in our list, confirm before navigating
+      const confirmNavigation = window.confirm(
+        "This letter may no longer exist. Would you like to refresh the list or go to the editor anyway?"
+      );
+      
+      if (confirmNavigation) {
+        // User wants to continue to the editor
+        navigate(`/editor/${id}`);
+      } else {
+        // Refresh the list
+        refreshLetters();
+      }
+    } else {
+      // Letter exists, navigate to editor
+      navigate(`/editor/${id}`);
+    }
+  }, [letters, navigate, refreshLetters]);
 
+  // Updated delete handler
   const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this letter?')) {
+      return;
+    }
+    
     try {
       await axios.delete(`${import.meta.env.VITE_API_URL}/api/letters/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      queryClient.invalidateQueries({ queryKey: ['letters'] });
+      // Force refresh the letters query and remove any references to the deleted letter
+      refreshLetters();
+      queryClient.removeQueries({ queryKey: ['letter', id] });
+      
+      // Clean up any localStorage references
+      try {
+        const storageKeys = Object.keys(localStorage);
+        for (const key of storageKeys) {
+          if (key.includes(id)) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch (error) {
+        // Silent error handling
+      }
     } catch (error) {
       console.error('Delete error:', error);
+      alert('Failed to delete the letter. Please try again.');
+    }
+  };
+
+  // Add a proper logout handler
+  const handleLogout = () => {
+    try {
+      // First clear our auth state
+      logout();
+      
+      // Clean up any sensitive localStorage data
+      const keysToRemove = ['google_auth_code', 'oauth_state'];
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // Optional: Call API to invalidate server-side session
+      fetch(`${import.meta.env.VITE_API_URL}/api/auth/reset?returnTo=login`, { 
+        method: 'GET',
+        credentials: 'include'
+      }).finally(() => {
+        // Navigate to login page
+        navigate('/login');
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+      // If there's an error, still try to navigate to login
+      navigate('/login');
     }
   };
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-4">
-        <p className="text-gray-600">Loading...</p>
-      </div>
+      <Box 
+        sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '100vh' 
+        }}
+      >
+        <CircularProgress />
+      </Box>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">My Letters</h1>
-        <div className="space-x-4">
-          <button 
-            onClick={handleCreateNew}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center"
-          >
-            <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            New Letter
-          </button>
-          <button 
-            onClick={logout}
-            className="border border-gray-300 hover:bg-gray-100 px-4 py-2 rounded"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
+    <Box sx={{ backgroundColor: '#f5f5f5', minHeight: '100vh', py: 4, minWidth: '100vw' }}>
+      <Container maxWidth="lg">
+        <Paper elevation={2} sx={{ p: 3, mb: 4, borderRadius: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h4" component="h1" fontWeight="bold">
+              My Letters
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<AddIcon />}
+                onClick={handleCreateNew}
+                sx={{ 
+                  textTransform: 'none',
+                  borderRadius: 1.5
+                }}
+              >
+                New Letter
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<LogoutIcon />}
+                onClick={handleLogout}
+                sx={{ 
+                  textTransform: 'none',
+                  borderRadius: 1.5
+                }}
+              >
+                Logout
+              </Button>
+            </Box>
+          </Box>
+        </Paper>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {letters?.map((letter) => (
-          <div key={letter.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="p-5">
-              <h2 className="text-xl font-semibold mb-2">{letter.title}</h2>
-              <span className="inline-block px-2 py-1 text-xs rounded bg-gray-200 text-gray-700 mb-3">
-                {letter.isDraft ? 'Draft' : 'Published'}
-              </span>
-              <p className="text-sm text-gray-500">
-                Last updated: {new Date(letter.updatedAt).toLocaleDateString()}
-              </p>
-            </div>
-            <div className="px-5 py-3 bg-gray-50 flex justify-start space-x-2">
-              <button 
-                onClick={() => handleEdit(letter.id)}
-                className="p-2 rounded-full hover:bg-gray-200"
-              >
-                <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-              <button 
-                onClick={() => handleDelete(letter.id)}
-                className="p-2 rounded-full hover:bg-gray-200"
-              >
-                <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+        <Grid container spacing={3}>
+          {letters?.length === 0 ? (
+            <Grid item xs={12}>
+              <Paper sx={{ p: 4, textAlign: 'center' }}>
+                <Typography variant="h6" color="text.secondary">
+                  No letters yet. Create your first letter to get started.
+                </Typography>
+              </Paper>
+            </Grid>
+          ) : (
+            letters?.map((letter) => (
+              <Grid item xs={12} sm={6} md={4} key={letter.id}>
+                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', borderRadius: 2 }}>
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Typography variant="h6" component="h2" gutterBottom noWrap>
+                      {letter.title}
+                    </Typography>
+                    <Chip 
+                      label={letter.isDraft ? 'Draft' : 'Published'} 
+                      size="small" 
+                      sx={{ mb: 2 }}
+                      color={letter.isDraft ? 'default' : 'success'}
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                      Last updated: {new Date(letter.updatedAt).toLocaleDateString()}
+                    </Typography>
+                  </CardContent>
+                  <Divider />
+                  <CardActions sx={{ justifyContent: 'flex-start', px: 2, py: 1 }}>
+                    <IconButton 
+                      size="small" 
+                      onClick={() => handleEdit(letter.id)}
+                      color="primary"
+                    >
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton 
+                      size="small" 
+                      onClick={() => handleDelete(letter.id)}
+                      color="error"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))
+          )}
+        </Grid>
+      </Container>
+    </Box>
   );
 };
 

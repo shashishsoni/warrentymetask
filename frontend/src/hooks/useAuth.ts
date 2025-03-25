@@ -32,15 +32,37 @@ export const useAuth = (): AuthContextType => {
     
     try {
       isFetchingUser.current = true;
+      
+      // First, check if token format is valid (simple check)
+      if (!storedToken || storedToken.trim() === '') {
+        throw new Error('Empty token');
+      }
+      
+      // Make the API call to verify the token
       const response = await axios.get(`${API_URL}/api/auth/me`, {
-        headers: { Authorization: `Bearer ${storedToken}` }
+        headers: { 
+          Authorization: `Bearer ${storedToken}`,
+          'Content-Type': 'application/json'
+        },
+        withCredentials: true
       });
+      
+      // Make sure we got valid user data back
+      if (!response.data || !response.data.id) {
+        throw new Error('Invalid user data returned');
+      }
+      
       setUser(response.data);
       setToken(storedToken);
       setIsAuthenticated(true);
     } catch (error) {
       console.error('Token verification failed:', error);
+      
+      // Clear all auth data on failure
       localStorage.removeItem('token');
+      localStorage.removeItem('google_auth_code');
+      localStorage.removeItem('oauth_state');
+      
       setToken(null);
       setUser(null);
       setIsAuthenticated(false);
@@ -87,11 +109,30 @@ export const useAuth = (): AuthContextType => {
   };
 
   const logout = useCallback(() => {
+    // Clear all tokens and auth state
     localStorage.removeItem('token');
+    localStorage.removeItem('google_auth_code');
+    localStorage.removeItem('oauth_state');
+    
+    // Clear React Query cache for authenticated requests
+    // This is important to prevent viewing cached data after logout
+    try {
+      // If available, clear the query client cache for all queries
+      const queryClient = (window as any).__REACT_QUERY_DEVTOOLS_GLOBAL_HOOK__?.clients?.get('0');
+      if (queryClient) {
+        queryClient.clear();
+      }
+    } catch (e) {
+      console.error('Error clearing query cache:', e);
+    }
+    
+    // Reset all auth state
     setToken(null);
     setUser(null);
     setIsAuthenticated(false);
     hasVerifiedToken.current = false;
+    
+    return true;
   }, []);
 
   const setAuthToken = useCallback((newToken: string) => {

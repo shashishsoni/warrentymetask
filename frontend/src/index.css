@@ -28,6 +28,9 @@ a:hover {
 
 body {
   margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
   display: flex;
   place-items: center;
   min-width: 320px;
@@ -69,4 +72,119 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* Quill editor fixes for full width */
+.quill-editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: 'Times New Roman', Times, serif;
+}
+
+.quill-editor-container .quill {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.quill-editor-container .ql-container {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 16px;
+  font-family: 'Times New Roman', Times, serif;
+  line-height: 1.6;
+}
+
+.quill-editor-container .ql-editor {
+  min-height: 100%;
+  padding: 20px 30px;
+  background-color: #fff;
+}
+
+/* Letter-like styling */
+.quill-editor-container .ql-editor p {
+  margin-bottom: 1em;
+}
+
+.quill-editor-container .ql-editor h1,
+.quill-editor-container .ql-editor h2,
+.quill-editor-container .ql-editor h3 {
+  margin-top: 1.5em;
+  margin-bottom: 0.75em;
+}
+
+/* Improve Quill toolbar appearance */
+.quill-editor-container .ql-toolbar {
+  border-radius: 4px 4px 0 0;
+  background-color: #f8f8f8;
+  border-color: #e0e0e0;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.quill-editor-container .ql-toolbar button {
+  height: 28px;
+  width: 28px;
+}
+
+.quill-editor-container .ql-container {
+  border-radius: 0 0 4px 4px;
+  border-color: #e0e0e0;
+}
+
+/* Better image handling in editor */
+.quill-editor-container .ql-editor img {
+  max-width: 100%;
+  margin: 10px auto;
+  display: block;
+}
+
+/* Fix toolbar button appearance */
+.quill-editor-container .ql-toolbar button {
+  background: transparent;
+  border: none;
+  padding: 3px 5px;
+}
+
+.quill-editor-container .ql-toolbar button:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+  border-color: transparent;
+}
+
+/* Print styling for better letter appearance when printing */
+@media print {
+  .quill-editor-container .ql-editor {
+    height: auto;
+    padding: 0;
+    box-shadow: none;
+    font-size: 12pt;
+  }
+  
+  .quill-editor-container .ql-toolbar {
+    display: none;
+  }
+}
+
+/* Global styling for full viewport width */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100vw;
+  min-height: 100vh;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* Ensure MUI containers can take full width when needed */
+.MuiContainer-root {
+  max-width: 100% !important;
+}
+
+/* Set box-sizing for all elements */
+* {
+  box-sizing: inherit;
 }

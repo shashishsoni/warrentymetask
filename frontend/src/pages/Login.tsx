@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Button, Container, Typography, Paper, CircularProgress } from '@mui/material';
-import { Google as GoogleIcon } from '@mui/icons-material';
+import { Box, Button, Container, Typography, Paper, CircularProgress, Divider } from '@mui/material';
+import { Google as GoogleIcon, Email as EmailIcon } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 
@@ -49,53 +49,108 @@ const Login: React.FC = () => {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
+    <Box
+      sx={{
+        height: '100vh',
+        width: '100vw',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
+        overflow: 'hidden',
+        margin: 0,
+        padding: 0
+      }}
+    >
+      <Container 
+        maxWidth="sm"
+        sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
           alignItems: 'center',
+          width: '100%',
+          padding: { xs: 2, sm: 3 }
         }}
       >
         <Paper
-          elevation={3}
+          elevation={8}
           sx={{
-            padding: 4,
+            padding: { xs: 3, sm: 5 },
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             width: '100%',
+            borderRadius: 3,
+            boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+            overflow: 'hidden'
           }}
         >
-          <Typography component="h1" variant="h5" gutterBottom>
-            Welcome to Letter Writer
+          <Box sx={{ 
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            mb: 3
+          }}>
+            <EmailIcon sx={{ fontSize: 40, color: 'primary.main', mr: 2 }} />
+            <Typography 
+              component="h1" 
+              variant="h4" 
+              sx={{ 
+                fontWeight: 700,
+                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent'
+              }}
+            >
+              Letter Writer
+            </Typography>
+          </Box>
+          
+          <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4 }}>
+            Create professional letters and save to Google Drive
           </Typography>
-          <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
-            Sign in to create and manage your letters
-          </Typography>
+          
+          <Divider sx={{ width: '80%', mb: 4 }} />
+          
           <Box sx={{ width: '100%' }}>
             <Button
               fullWidth
               variant="contained"
               color="primary"
+              size="large"
               startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <GoogleIcon />}
               disabled={loading}
               onClick={handleGoogleLogin}
-              sx={{ py: 1.5 }}
+              sx={{ 
+                py: 1.5,
+                fontSize: '1rem', 
+                textTransform: 'none',
+                borderRadius: 2,
+                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                background: loading ? 'primary.main' : 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                '&:hover': {
+                  boxShadow: '0 6px 12px rgba(0,0,0,0.2)',
+                }
+              }}
             >
               Sign in with Google
             </Button>
           </Box>
+          
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ mt: 3 }}>
+            Secure authentication with Google
+          </Typography>
         </Paper>
-      </Box>
-      <Box sx={{ mt: 2 }}>
-        <Typography variant="caption" color="text.secondary" align="center">
-          Trouble signing in? Try disabling ad-blockers or privacy extensions,
-          or use an incognito window.
-        </Typography>
-      </Box>
-    </Container>
+        
+        <Box sx={{ mt: 3, textAlign: 'center', maxWidth: '90%' }}>
+          <Typography variant="caption" color="text.secondary" sx={{ opacity: 0.8 }}>
+            Trouble signing in? Try disabling ad-blockers or privacy extensions,
+            or use an incognito window.
+          </Typography>
+        </Box>
+      </Container>
+    </Box>
   );
 };
 
