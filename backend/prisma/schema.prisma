@@ -11,7 +11,8 @@ model User {
   id            String    @id @default(auto()) @map("_id") @db.ObjectId
   email         String    @unique
   name          String?
-  googleId      String    @unique
+  googleId      String?   
+  avatar        String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   letters       Letter[]
@@ -30,4 +31,4 @@ model Letter {
   updatedAt   DateTime  @updatedAt
   userId      String    @db.ObjectId
   user        User      @relation(fields: [userId], references: [id])
-} 
+}

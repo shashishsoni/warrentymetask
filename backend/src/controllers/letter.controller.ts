@@ -183,7 +183,8 @@ export const saveToGoogleDrive = async (req: Request, res: Response) => {
       console.log(`Missing access token for user ${userId}`);
       return res.status(401).json({ 
         message: 'Google Drive access is not available. Please reconnect your Google account.',
-        error: 'missing_token'
+        error: 'missing_token',
+        redirectUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/google`
       });
     }
 
@@ -198,6 +199,37 @@ export const saveToGoogleDrive = async (req: Request, res: Response) => {
       access_token: letter.user.accessToken,
       refresh_token: letter.user.refreshToken
     });
+
+    // Check if token is expired and try to refresh it
+    const tokenExpiry = letter.user.tokenExpiry ? new Date(letter.user.tokenExpiry) : null;
+    const now = new Date();
+    if (tokenExpiry && tokenExpiry < now) {
+      try {
+        console.log('Token expired, attempting to refresh...');
+        const { credentials } = await oauth2Client.refreshAccessToken();
+        
+        // Update tokens in database
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            accessToken: credentials.access_token,
+            refreshToken: credentials.refresh_token || letter.user.refreshToken,
+            tokenExpiry: credentials.expiry_date ? new Date(credentials.expiry_date) : undefined
+          }
+        });
+        
+        // Update credentials for this request
+        oauth2Client.setCredentials(credentials);
+        console.log('Token refreshed successfully');
+      } catch (refreshError) {
+        console.error('Failed to refresh token:', refreshError);
+        return res.status(401).json({ 
+          message: 'Your Google authorization has expired. Please reconnect your Google account.',
+          error: 'expired_token',
+          redirectUrl: `${process.env.BACKEND_URL || 'http://localhost:3001'}/api/auth/google`
+        });
+      }
+    }
 
     console.log(`Creating Google Docs client`);
     const docs = google.docs({ version: 'v1', auth: oauth2Client });
