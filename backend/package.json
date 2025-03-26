@@ -4,8 +4,8 @@
   "description": "Backend for Letter Writer application",
   "main": "dist/server.js",
   "scripts": {
-    "start": "node dist/server.js",
-    "dev": "nodemon src/server.ts",
+    "start": "node --max-old-space-size=2048 dist/server.js",
+    "dev": "nodemon --max-old-space-size=2048 src/server.ts",
     "build": "npm install --save-dev @types/node @types/express @types/cors @types/morgan @types/jsonwebtoken && tsc",
     "test": "jest",
     "prisma:generate": "prisma generate",

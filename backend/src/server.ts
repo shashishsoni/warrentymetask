@@ -13,10 +13,17 @@ import driveRoutes from './routes/drive.routes';
 
 // Initialize Express app
 const app: Express = express();
-const port = process.env.PORT || 3001;
+const port = parseInt(process.env.PORT || '3001', 10);
 
 // Initialize Prisma client
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  log: ['error', 'warn'],
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL
+    }
+  }
+});
 
 // Middleware
 app.use(cors({
